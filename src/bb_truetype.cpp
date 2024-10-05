@@ -1,4 +1,4 @@
-#include "truetype.h"
+#include "bb_truetype.h"
 #include "bbtt.inl"
 
 //Kerning is optional. Many fonts don't have kerning tables anyway.
@@ -44,7 +44,7 @@ void bb_truetype::setTextBoundary(uint16_t _start_x, uint16_t _end_x, uint16_t _
     bbttSetTextBoundary(&_bbtt, _start_x, _end_x, _end_y);
 }
 
-void bb_truetype::setTextColor(uint16_t _onLine, uint16_t _inside) {
+void bb_truetype::setTextColor(uint32_t _onLine, uint32_t _inside) {
     bbttSetTextColor(&_bbtt, _onLine, _inside);
 }
 
@@ -95,7 +95,7 @@ uint16_t bb_truetype::getStringWidth(const String _string) {
     wchar_t *wcharacter = (wchar_t *)calloc(sizeof(wchar_t), length + 1);
     stringToWchar(_string, wcharacter);
 
-    output = bbttGetStringWidth(&_bbtt, wcharacter);
+    output = bbttGetStringWidthW(&_bbtt, wcharacter);
     free(wcharacter);
     wcharacter = nullptr;
     return output;

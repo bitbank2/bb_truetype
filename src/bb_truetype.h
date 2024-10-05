@@ -32,6 +32,9 @@ typedef uint8_t byte;
 #include "FS.h"
 #endif /*FS_H*/
 
+// Use this to skip either drawing the outline or the inside
+#define COLOR_NONE 0x80000001
+
 // These limits are reasonable for complex glyphs
 // increase only if needed
 #define MAX_POINTS 1024
@@ -225,8 +228,8 @@ typedef struct bbtt_tag {
     uint16_t displayWidthFrame;
     uint16_t framebufferBit;
     uint8_t stringRotation;
-    uint16_t colorLine;
-    uint16_t colorInside;
+    uint32_t colorLine;
+    uint32_t colorInside;
     uint8_t kerningOn;
     uint8_t bBigEndian;
 
@@ -248,7 +251,7 @@ class bb_truetype {
     void setCharacterSpacing(int16_t _characterSpace, uint8_t _kerning = 1);
     void setCharacterSize(uint16_t _characterSize);
     void setTextBoundary(uint16_t _start_x, uint16_t _end_x, uint16_t _end_y);
-    void setTextColor(uint16_t _onLine, uint16_t _inside);
+    void setTextColor(uint32_t _onLine, uint32_t _inside);
     void setTextRotation(uint16_t _rotation);
 
     uint16_t getStringWidth(const wchar_t *szwString);
@@ -310,7 +313,7 @@ class bb_truetype {
 #ifdef ARDUINO
     void stringToWchar(String _string, wchar_t _charctor[]);
 #endif
-    void drawLine(int16_t _start_x, int16_t _start_y, int16_t _end_x, int16_t _end_y, uint16_t _colorCode);
+    void drawLine(int16_t _start_x, int16_t _start_y, int16_t _end_x, int16_t _end_y, uint32_t _colorCode);
     uint8_t GetU8ByteCount(char _ch);
     bool IsU8LaterByte(char _ch);
 };

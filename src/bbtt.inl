@@ -48,7 +48,7 @@ void bbttSetRotation(BBTT *pBBTT, uint16_t _rotation)
     pBBTT->stringRotation = _rotation;
 } /* bbttSetRotation() */
 
-void bbttSetTextColor(BBTT *pBBTT, uint16_t _onLine, uint16_t _inside)
+void bbttSetTextColor(BBTT *pBBTT, uint32_t _onLine, uint32_t _inside)
 {
     pBBTT->colorLine = _onLine;
     pBBTT->colorInside = _inside;
@@ -60,20 +60,20 @@ int bbttRead(BBTT *pBBTT, uint8_t *d, int iLen) {
         int totalBytesRead = 0;
 #ifdef ESP32
         while (iLen > 0) {
-            if (iBufferedBytes == 0) {
-                iBufferedBytes = file.read(u8FileBuf, FILE_BUF_SIZE);
-                iCurrentBufSize = iBufferedBytes;
-                if (iBufferedBytes <= 0) break;
-                u32BufPosition = 0;
+            if (pBBTT->iBufferedBytes == 0) {
+                pBBTT->iBufferedBytes = pBBTT->file.read(pBBTT->u8FileBuf, FILE_BUF_SIZE);
+                pBBTT->iCurrentBufSize = pBBTT->iBufferedBytes;
+                if (pBBTT->iBufferedBytes <= 0) break;
+                pBBTT->u32BufPosition = 0;
             }
 
-            int bytesToCopy = min(iLen, iBufferedBytes);
-            memcpy(d, u8FileBuf + u32BufPosition, bytesToCopy);
+            int bytesToCopy = min(iLen, pBBTT->iBufferedBytes);
+            memcpy(d, pBBTT->u8FileBuf + pBBTT->u32BufPosition, bytesToCopy);
 
             d += bytesToCopy;
             iLen -= bytesToCopy;
-            iBufferedBytes -= bytesToCopy;
-            u32BufPosition += bytesToCopy;
+            pBBTT->iBufferedBytes -= bytesToCopy;
+            pBBTT->u32BufPosition += bytesToCopy;
             totalBytesRead += bytesToCopy;
         }
 #endif // ESP32
@@ -123,13 +123,13 @@ void bbttSeek(BBTT *pBBTT, uint32_t u32Offset) {
         TODO/FIXME: for some reason this doesn't work.
         If a seek position is within the current loaded buffer, it should just change the buffer position
 
-        if (u32Offset >= file.position() - iCurrentBufSize && u32Offset < file.position()) {
-            u32BufPosition = u32Offset - (file.position() - iCurrentBufSize);
-            iBufferedBytes = file.position() - u32Offset;
+        if (pBBTT->u32Offset >= pBBTT->file.position() - pBBTT->iCurrentBufSize && u32Offset < pBBTT->file.position()) {
+            pBBTT->u32BufPosition = u32Offset - (pBBTT->file.position() - pBBTT->iCurrentBufSize);
+            pBBTT->iBufferedBytes = pBBTT->file.position() - u32Offset;
         } else {
         */
 #ifdef ESP32
-            file.seek(u32Offset);
+            pBBTT->file.seek(u32Offset);
 #endif
         pBBTT->iBufferedBytes = 0;
         // }
@@ -157,7 +157,7 @@ uint32_t bbttCalculateCheckSum(BBTT *pBBTT, uint32_t offset, uint32_t length) {
 uint32_t bbttPosition(BBTT *pBBTT) {
     if (!pBBTT->pTTF) {
 #ifdef ESP32
-        return file.position() - iBufferedBytes;
+        return pBBTT->file.position() - pBBTT->iBufferedBytes;
 #else
         return 0;
 #endif
@@ -922,8 +922,10 @@ void bbttTextDraw(BBTT *pBBTT, int16_t _x, int16_t _y, const wchar_t _character[
 
         if (pBBTT->glyph.numberOfContours >= 0) {
             bbttGenerateOutline(pBBTT, _x, _y, pBBTT->characterSize);
-            bbttFillGlyph(pBBTT, _x, _y, pBBTT->characterSize);
-            if (pBBTT->colorLine != pBBTT->colorInside) {
+            if (pBBTT->colorInside != COLOR_NONE) {
+                bbttFillGlyph(pBBTT, _x, _y, pBBTT->characterSize);
+            }
+            if (pBBTT->colorLine != COLOR_NONE && pBBTT->colorLine != pBBTT->colorInside) {
                 bbttDrawOutline(pBBTT, _x, _y, pBBTT->characterSize);
             }
         }
@@ -1053,27 +1055,27 @@ uint8_t bbttSetTtfPointer(BBTT *pBBTT, uint8_t *p, uint32_t u32Size, uint8_t _ch
 
     if (bbttReadTableDirectory(pBBTT, _checkCheckSum) == 0) {
 #ifdef ESP32
-        file.close();
+        pBBTT->file.close();
 #endif
         return 0;
     }
 
     if (bbttReadCmap(pBBTT) == 0) {
 #ifdef ESP32
-        file.close();
+        pBBTT->file.close();
 #endif
         return 0;
     }
 
     if (bbttReadHMetric(pBBTT) == 0) {
 #ifdef ESP32
-        file.close();
+        pBBTT->file.close();
 #endif
         return 0;
     }
 
 #ifdef ENABLEKERNING
-    readKern();
+    ttbbReadKern(pBBTT);
 #endif
     bbttReadHeadTable(pBBTT);
     return 1;
@@ -1081,7 +1083,7 @@ uint8_t bbttSetTtfPointer(BBTT *pBBTT, uint8_t *p, uint32_t u32Size, uint8_t _ch
 
 void bbttEnd(BBTT *pBBTT) {
 #ifdef ESP32
-    file.close();
+    pBBTT->file.close();
 #endif
     bbttFreeGlyph(pBBTT);
     if (pBBTT->table != nullptr) free(pBBTT->table);
