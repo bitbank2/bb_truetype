@@ -29,7 +29,7 @@ void setup()
   bbtt.setTextBoundary(0, lcd.width(), lcd.height());
   bbtt.setTextColor(TFT_BLUE, COLOR_NONE); // no fill color, just outline
   bbtt.textDraw(0, 80, "Hello");
-  bbtt.setTextColor(TFT_GREEN, TFT_GREEN); // only fill, no outline
+  bbtt.setTextColor(COLOR_NONE, TFT_GREEN); // only fill, no outline
   bbtt.textDraw(0, 180, "World!");
 } /* setup() */
 
