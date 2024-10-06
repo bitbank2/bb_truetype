@@ -13,9 +13,9 @@
 BB_SPI_LCD lcd;
 bb_truetype bbtt;
 
-void DrawLine(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color)
+void DrawLine(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint32_t color)
 {
-  lcd.drawLine(x1, y1, x2, y2, color); // use the line function from bb_spi_lcd
+  lcd.drawLine(x1, y1, x2, y2, (uint16_t)color); // use the line function from bb_spi_lcd
 }
 
 void setup()
@@ -24,7 +24,8 @@ void setup()
   lcd.fillScreen(TFT_BLACK);
   bbtt.setTtfDrawLine(DrawLine); // pass the pointer to our drawline callback function
   bbtt.setTtfPointer((uint8_t *)Roboto_Black, sizeof(Roboto_Black)); // use the font from FLASH
-  bbtt.setCharacterSize(48);
+  bbtt.setTextAlignment(TEXT_ALIGN_CENTER);
+  bbtt.setCharacterSize(90);
   bbtt.setCharacterSpacing(0);
   bbtt.setTextBoundary(0, lcd.width(), lcd.height());
   bbtt.setTextColor(TFT_BLUE, COLOR_NONE); // no fill color, just outline

@@ -1,21 +1,20 @@
-//
-// bb_truetype
-//
-// Reads truetype(.ttf) files and generates bitmap output
-//
-//TrueType™ Reference Manual: https://developer.apple.com/fonts/TrueType-Reference-Manual/
-// get info on a ttf file: https://fontdrop.info/
+/*
+Read truetype(.ttf) and generate bitmap.
 
-// MIT licencse
-// original source by https://github.com/garretlab/truetype
-// extended by https://github.com/k-omura/truetype_Arduino/
-// lots of bugfixes and improvements by Nic.
-// Completely rewritten and optimized by Larry Bank
-//
+TrueType™ Reference Manual: https://developer.apple.com/fonts/TrueType-Reference-Manual/
+get info on a ttf file: https://fontdrop.info/
+
+MIT licencse
+original source by https://github.com/garretlab/truetype
+extended by https://github.com/k-omura/truetype_Arduino/
+lots of bugfixes and improvements by Nic.
+total rewrite and optimization by Larry Bank
+*/
 
 #define TRUETYPE_H
 
 #ifndef ARDUINO
+#define memcpy_P memcpy
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -37,8 +36,16 @@ typedef uint8_t byte;
 
 // These limits are reasonable for complex glyphs
 // increase only if needed
+// These constants are to avoid the use of dynamic memory
+// allocation within the library
+
 #define MAX_POINTS 1024
 #define MAX_ENDPOINTS 16
+
+#define MAX_CONTOURS 16
+#define MAX_GLYPH_POINTS 256
+
+#define MAX_TABLES 64
 
 #define FLAG_ONCURVE (1 << 0)
 #define FLAG_XSHORT (1 << 1)
@@ -56,8 +63,15 @@ typedef uint8_t byte;
 #define ROTATE_180 2
 #define ROTATE_270 3
 
-#define FILE_BUF_SIZE 256
-typedef void(TTF_DRAWLINE)(int16_t _start_x, int16_t _start_y, int16_t _end_x, int16_t _end_y, uint16_t _colorCode);
+enum {
+    BBTT_SUCCESS = 0,
+    BBTT_INVALID_FILE,
+    BBTT_INVALID_PARAMETER,
+    BBTT_GLYPH_NOT_FOUND
+};
+
+#define FILE_BUF_SIZE 512
+typedef void(TTF_DRAWLINE)(int16_t _start_x, int16_t _start_y, int16_t _end_x, int16_t _end_y, uint32_t _colorCode);
 
 typedef struct {
     char name[5];
@@ -98,9 +112,9 @@ typedef struct {
     int16_t yMin;
     int16_t xMax;
     int16_t yMax;
-    uint16_t *endPtsOfContours;
+    uint16_t endPtsOfContours[MAX_CONTOURS];
     uint16_t numberOfPoints;
-    ttPoint_t *points;
+    ttPoint_t points[MAX_GLYPH_POINTS];
 } ttGlyph_t;
 
 typedef struct {
@@ -173,6 +187,14 @@ typedef struct {
     int8_t up;
 } ttWindIntersect_t;
 
+typedef struct {
+    int16_t xAdvance; // full width of the character
+    int16_t xOffset; // offset to start of left edge of bitmap
+    int16_t width; // width of bitmap containing pixels
+    int16_t height; // height of bitmap containing pixels
+    int16_t yOffset; // offset (can be negative) to top of bitmap
+} ttCharBox_t;
+
 // structure holding all of the class member variables
 typedef struct bbtt_tag {
 #ifdef ESP32
@@ -192,7 +214,7 @@ typedef struct bbtt_tag {
     uint16_t charCode;
     int16_t xMin, xMax, yMin, yMax;
     uint16_t numTables;
-    ttTable_t *table;
+    ttTable_t table[MAX_TABLES];
     ttHeadttTable_t headTable;
     // cmap. maps character codes to glyph indices
     ttCmapIndex_t cmapIndex;
@@ -232,7 +254,8 @@ typedef struct bbtt_tag {
     uint32_t colorInside;
     uint8_t kerningOn;
     uint8_t bBigEndian;
-
+    uint8_t textAlign;
+    uint8_t lastError;
 } BBTT;
 
 const int numTablesPos = 4;
@@ -253,67 +276,23 @@ class bb_truetype {
     void setTextBoundary(uint16_t _start_x, uint16_t _end_x, uint16_t _end_y);
     void setTextColor(uint32_t _onLine, uint32_t _inside);
     void setTextRotation(uint16_t _rotation);
-
+    void getCharBox(wchar_t _c, ttCharBox_t *pBox);
+    void setTextAlignment(uint8_t _alignment);
     uint16_t getStringWidth(const wchar_t *szwString);
     uint16_t getStringWidth(const char *szString);
 #ifdef ARDUINO
     uint16_t getStringWidth(const String _string);
     void textDraw(int16_t _x, int16_t _y, const String _string);
 #endif
-    
     void textDraw(int16_t _x, int16_t _y, const wchar_t _character[]);
     void textDraw(int16_t _x, int16_t _y, const char _character[]);
-
     void end();
 
    private:
-
     BBTT _bbtt;
-    uint8_t getUInt8t();
-    int16_t getInt16t();
-    uint16_t getUInt16t();
-    uint32_t getUInt32t();
-
-    int ttfRead(uint8_t *d, int iLen);
-    void ttfSeek(uint32_t u32Offset);
-    uint32_t ttfPosition(void);
-    // basic
-    uint32_t calculateCheckSum(uint32_t offset, uint32_t length);
-    uint32_t seekToTable(const char *name);
-    int readTableDirectory(int checkCheckSum);
-    void readHeadTable();
-    void readCoords(char _xy, uint16_t _startPoint = 0);
-
-    // Glyph
-    uint32_t getGlyphOffset(uint16_t index);
-    uint16_t codeToGlyphId(uint16_t code);
-    uint8_t readSimpleGlyph(uint8_t _addGlyph = 0);
-    uint8_t readCompoundGlyph();
-
-    uint8_t readCmapFormat4();
-    uint8_t readCmap();
-
-    // hmtx. metric information for the horizontal layout each of the glyphs
-    uint8_t readHMetric();
-    ttHMetric_t getHMetric(uint16_t _code);
-
-    uint8_t readKern();
-    int16_t getKerning(uint16_t _left_glyph, uint16_t _right_glyph);
-    uint8_t readHhea();
-
-    void generateOutline(int16_t _x, int16_t _y, uint16_t characterSize);
-    void drawOutline(int16_t _x, int16_t _y, uint16_t characterSize);
-    void fillGlyph(int16_t _x_min, int16_t _y_min, uint16_t characterSize);
-    uint8_t readGlyph(uint16_t code, uint8_t _justSize = 0);
-    void freeGlyph();
-
-    void addLine(int16_t _x0, int16_t _y0, int16_t _x1, int16_t _y1);
-    int32_t isLeft(ttCoordinate_t *_p0, ttCoordinate_t *_p1, ttCoordinate_t *_point);
-
 #ifdef ARDUINO
     void stringToWchar(String _string, wchar_t _charctor[]);
-#endif
-    void drawLine(int16_t _start_x, int16_t _start_y, int16_t _end_x, int16_t _end_y, uint32_t _colorCode);
     uint8_t GetU8ByteCount(char _ch);
     bool IsU8LaterByte(char _ch);
+#endif
 };

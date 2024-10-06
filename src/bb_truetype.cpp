@@ -1,6 +1,5 @@
 //
-// bb_truetype
-// class definition
+// C++ wrapper class for the bb_truetype library
 // Original source by https://github.com/garretlab/truetype
 // extended by https://github.com/k-omura/truetype_Arduino/
 // bugfixes and improvements by Nic
@@ -42,6 +41,10 @@ bb_truetype::bb_truetype() {
 
 void bb_truetype::end() {
     bbttEnd(&_bbtt);
+}
+
+void bb_truetype::setTextAlignment(uint8_t _alignment) {
+    _bbtt.textAlign = _alignment;
 }
 
 #ifdef ESP32
@@ -108,6 +111,10 @@ uint16_t bb_truetype::getStringWidth(const wchar_t *szwString) {
 
 uint16_t bb_truetype::getStringWidth(const char *szString) {
     return bbttGetStringWidth(&_bbtt, szString);
+}
+
+void bb_truetype::getCharBox(wchar_t _c, ttCharBox_t *pBox) {
+    bbttGetCharBox(&_bbtt, _c, pBox);
 }
 
 #ifdef ARDUINO

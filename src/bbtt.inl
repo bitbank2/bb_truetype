@@ -31,10 +31,6 @@
  * THE SOFTWARE.
  */
 
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-
 void bbttInit(BBTT *pBBTT)
 {
     pBBTT->numPoints = pBBTT->numBeginPoints = pBBTT->numEndPoints = 0;
@@ -50,6 +46,7 @@ void bbttInit(BBTT *pBBTT)
     pBBTT->pTTF = NULL;
     pBBTT->pfnDrawLine = NULL;
     pBBTT->iCurrentBufSize = 0;
+    pBBTT->textAlign = TEXT_ALIGN_LEFT;
 } /* bbttInit() */
 
 void bbttSetRotation(BBTT *pBBTT, uint16_t _rotation)
@@ -149,13 +146,13 @@ void bbttSeek(BBTT *pBBTT, uint32_t u32Offset) {
         TODO/FIXME: for some reason this doesn't work.
         If a seek position is within the current loaded buffer, it should just change the buffer position
 
-        if (pBBTT->u32Offset >= pBBTT->file.position() - pBBTT->iCurrentBufSize && u32Offset < pBBTT->file.position()) {
-            pBBTT->u32BufPosition = u32Offset - (pBBTT->file.position() - pBBTT->iCurrentBufSize);
-            pBBTT->iBufferedBytes = pBBTT->file.position() - u32Offset;
+        if (u32Offset >= file.position() - iCurrentBufSize && u32Offset < file.position()) {
+            u32BufPosition = u32Offset - (file.position() - iCurrentBufSize);
+            iBufferedBytes = file.position() - u32Offset;
         } else {
         */
 #ifdef ESP32
-            pBBTT->file.seek(u32Offset);
+        pBBTT->file.seek(u32Offset);
 #endif
         pBBTT->iBufferedBytes = 0;
         // }
@@ -312,12 +309,6 @@ uint8_t bbttReadSimpleGlyph(BBTT *pBBTT, uint8_t _addGlyph) {
         counterPoints = 0;
     }
 
-    if (_addGlyph) {
-        pBBTT->glyph.endPtsOfContours = (uint16_t *)realloc(pBBTT->glyph.endPtsOfContours, (sizeof(uint16_t) * pBBTT->glyph.numberOfContours));
-    } else {
-        pBBTT->glyph.endPtsOfContours = (uint16_t *)malloc((sizeof(uint16_t) * pBBTT->glyph.numberOfContours));
-    }
-
     for (uint16_t i = counterContours; i < pBBTT->glyph.numberOfContours; i++) {
         pBBTT->glyph.endPtsOfContours[i] = counterPoints + bbttGetUInt16t(pBBTT);
     }
@@ -330,12 +321,6 @@ uint8_t bbttReadSimpleGlyph(BBTT *pBBTT, uint8_t _addGlyph) {
         }
     }
     pBBTT->glyph.numberOfPoints++;
-
-    if (_addGlyph) {
-        pBBTT->glyph.points = (ttPoint_t *)realloc(pBBTT->glyph.points, sizeof(ttPoint_t) * (pBBTT->glyph.numberOfPoints + pBBTT->glyph.numberOfContours));
-    } else {
-        pBBTT->glyph.points = (ttPoint_t *)malloc(sizeof(ttPoint_t) * (pBBTT->glyph.numberOfPoints + pBBTT->glyph.numberOfContours));
-    }
 
     for (uint16_t i = counterPoints; i < pBBTT->glyph.numberOfPoints; i++) {
         flag = bbttGetUInt8t(pBBTT);
@@ -888,20 +873,20 @@ void bbttFillGlyph(BBTT *pBBTT, int16_t _x_min, int16_t _y_min, uint16_t charact
     }
 }
 
-/* free glyph */
-void bbttFreeGlyph(BBTT *pBBTT)
-{
-    if (pBBTT->glyph.points != nullptr) free(pBBTT->glyph.points);
-    if (pBBTT->glyph.endPtsOfContours != nullptr) free(pBBTT->glyph.endPtsOfContours);
-    pBBTT->glyph.points = nullptr;
-    pBBTT->glyph.endPtsOfContours = nullptr;
-    pBBTT->glyph.numberOfPoints = 0;
-}
-
 void bbttTextDraw(BBTT *pBBTT, int16_t _x, int16_t _y, const wchar_t _character[]) {
     uint8_t c = 0;
     uint16_t prev_code = 0;
 
+    if (pBBTT->textAlign != TEXT_ALIGN_LEFT) {
+        // need to get the width of the curernt line to center it or align right
+        int cx = bbttGetStringWidthW(pBBTT, _character);
+        if (pBBTT->textAlign == TEXT_ALIGN_CENTER) {
+            _x = pBBTT->start_x + (pBBTT->end_x - pBBTT->start_x - cx)/2;
+        } else { // right align
+            _x = pBBTT->end_x - cx;
+        }
+        if (_x < pBBTT->start_x) _x = pBBTT->start_x; // can't start left of text box
+    }
     while (_character[c] != '\0') {
         // space (half-width, full-width)
         if ((_character[c] == ' ') || (_character[c] == L'　')) {
@@ -924,7 +909,9 @@ void bbttTextDraw(BBTT *pBBTT, int16_t _x, int16_t _y, const wchar_t _character[
         }
 #endif
         prev_code = pBBTT->charCode;
-
+        if (prev_code == 0) {
+            pBBTT->lastError = BBTT_GLYPH_NOT_FOUND;
+        }
         ttHMetric_t hMetric = bbttGetHMetric(pBBTT, pBBTT->charCode);
 
         // Line breaks when reaching the edge of the display
@@ -956,7 +943,8 @@ void bbttTextDraw(BBTT *pBBTT, int16_t _x, int16_t _y, const wchar_t _character[
             }
         }
         pBBTT->numPoints = pBBTT->numBeginPoints = pBBTT->numEndPoints = 0; // reset for next pass
-        bbttFreeGlyph(pBBTT);
+        pBBTT->glyph.numberOfPoints = 0;
+        pBBTT->glyph.numberOfContours = 0;
 
         _x += hMetric.advanceWidth;
         c++;
@@ -967,7 +955,6 @@ void bbttTextDraw(BBTT *pBBTT, int16_t _x, int16_t _y, const wchar_t _character[
 int bbttReadTableDirectory(BBTT *pBBTT, int checkCheckSum) {
     bbttSeek(pBBTT, numTablesPos);
     pBBTT->numTables = bbttGetUInt16t(pBBTT);
-    pBBTT->table = (ttTable_t *)malloc(sizeof(ttTable_t) * pBBTT->numTables);
     bbttSeek(pBBTT, tablePos);
     for (int i = 0; i < pBBTT->numTables; i++) {
         for (int j = 0; j < 4; j++) {
@@ -1079,6 +1066,7 @@ uint8_t bbttSetTtfPointer(BBTT *pBBTT, uint8_t *p, uint32_t u32Size, uint8_t _ch
     pBBTT->pTTF = p;
     pBBTT->u32TTFSize = u32Size;
 
+   // printf("BBTT size = %d\n", sizeof(BBTT));
     if (bbttReadTableDirectory(pBBTT, _checkCheckSum) == 0) {
 #ifdef ESP32
         pBBTT->file.close();
@@ -1101,7 +1089,7 @@ uint8_t bbttSetTtfPointer(BBTT *pBBTT, uint8_t *p, uint32_t u32Size, uint8_t _ch
     }
 
 #ifdef ENABLEKERNING
-    ttbbReadKern(pBBTT);
+    readKern();
 #endif
     bbttReadHeadTable(pBBTT);
     return 1;
@@ -1111,8 +1099,8 @@ void bbttEnd(BBTT *pBBTT) {
 #ifdef ESP32
     pBBTT->file.close();
 #endif
-    bbttFreeGlyph(pBBTT);
-    if (pBBTT->table != nullptr) free(pBBTT->table);
+    pBBTT->glyph.numberOfPoints = 0;
+    pBBTT->glyph.numberOfContours = 0;
 }
 
 void bbttSetFramebuffer(BBTT *pBBTT, uint16_t _framebufferWidth, uint16_t _framebufferHeight, uint16_t _framebuffer_bit, uint8_t *_framebuffer) {
@@ -1169,7 +1157,7 @@ uint8_t bbttSetTtfFile(BBTT *pBBTT, File _file, uint8_t _checkCheckSum) {
 #endif // ESP32
 
 void bbttSetCharacterSize(BBTT *pBBTT, uint16_t _characterSize) {
-    pBBTT->characterSize = _characterSize * 2; // this needs to be doubled to match the freetype point size
+    pBBTT->characterSize = _characterSize;
 }
 
 void bbttSetCharacterSpacing(BBTT *pBBTT, int16_t _characterSpace, uint8_t _kerning) {
@@ -1241,3 +1229,29 @@ int16_t bbttGetKerning(BBTT *pBBTT, uint16_t _left_glyph, uint16_t _right_glyph)
     return result;
 } /* bbttGetKerning() */
 #endif
+
+//
+// Get the position and size of the bitmap for the given character
+//
+void bbttGetCharBox(BBTT *pBBTT, wchar_t _c, ttCharBox_t *pBox)
+{
+    ttHMetric_t hMetric;
+    uint16_t code;
+    
+    if (!pBox) return; // silently fail when passed NULL
+    code = bbttCodeToGlyphId(pBBTT, _c);
+    if (code == 0) return; // silently fail when passed a character not in the font
+    
+    bbttReadGlyph(pBBTT, code, 1);
+    hMetric = bbttGetHMetric(pBBTT, code);
+    
+    pBox->xAdvance = hMetric.advanceWidth;
+    pBox->xOffset = hMetric.leftSideBearing;
+    int16_t ys = round((float)(pBBTT->ascender - pBBTT->glyph.yMax) * (float)pBBTT->characterSize / (float)pBBTT->headTable.unitsPerEm);
+    int16_t ye = round((float)(pBBTT->ascender - pBBTT->glyph.yMin) * (float)pBBTT->characterSize / (float)pBBTT->headTable.unitsPerEm);
+    int16_t xs = round((float)pBBTT->glyph.xMin * (float)pBBTT->characterSize / (float)pBBTT->headTable.unitsPerEm);
+    int16_t xe = /*_x_min +*/ round((float)pBBTT->glyph.xMax * (float)pBBTT->characterSize / (float)pBBTT->headTable.unitsPerEm);
+    pBox->width = (xe - xs);
+    pBox->height = (ye - ys);
+    pBox->yOffset = ys;
+} /* bbttGetCharBox() */
