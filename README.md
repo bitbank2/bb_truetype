@@ -21,6 +21,7 @@ Features:<br>
 - Allows drawing of character outlines, filled interiors or both in two different colors<br>
 - DrawLine() callback function allows your code to have complete control over the output. This also allows for running the code with no local framebuffer.
 - Can draw characters of any size. Some internal limits may need to be raised to draw characters larger than 150pt.
+- Only requires 8K of RAM (the default structure limits) to draw characters of almost any size.
 <br>
 See the Wiki for help getting started<br>
 https://github.com/bitbank2/bb_truetype/wiki <br>
