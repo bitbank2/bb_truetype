@@ -1,7 +1,9 @@
 bb_truetype (BitBank TrueType font renderer library)<br>
 ----------------------------------------------------
-Copyright (c) 2024 BitBank Software, Inc.<br>
-Written by Larry Bank<br>
+Original source by https://github.com/garretlab/truetype<br>
+extended by https://github.com/k-omura/truetype_Arduino/<br>
+bugfixes and improvements by Nic<br>
+Major improvements and rewrite into C by Larry Bank<br>
 bitbank@pobox.com<br>
 <br>
 <b>What is it?</b><br>
