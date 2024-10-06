@@ -1,7 +1,10 @@
 //
 // bb_truetype
 // class definition
-// written by Larry Bank (bitbank@pobox.com)
+// Original source by https://github.com/garretlab/truetype
+// extended by https://github.com/k-omura/truetype_Arduino/
+// bugfixes and improvements by Nic
+// Major improvements and rewrite into C by Larry Bank
 //
 /*
  * The MIT License (MIT)
