@@ -228,6 +228,7 @@ typedef struct bbtt_tag {
     ttKernFormat0_t kernFormat0;
     uint32_t kernTablePos;
     int16_t ascender;
+    uint16_t numOfLongHorMetrics;
     // generate points
     ttCoordinate_t points[MAX_POINTS];
     uint16_t numPoints;

@@ -439,6 +439,21 @@ uint8_t bbttReadHhea(BBTT *pBBTT) {
     }
     bbttGetUInt32t(pBBTT);
     pBBTT->ascender = bbttGetInt16t(pBBTT);
+    bbttGetInt16t(pBBTT); // descent
+    bbttGetInt16t(pBBTT); // lineGap
+    bbttGetUInt16t(pBBTT); // advanceWidthMax
+    bbttGetInt16t(pBBTT); // minLeftSideBearing
+    bbttGetInt16t(pBBTT); // minRightSideBearing
+    bbttGetInt16t(pBBTT); // xMaxExtent
+    bbttGetInt16t(pBBTT); // caretSlopeRise
+    bbttGetInt16t(pBBTT); // caretSlopeRun
+    bbttGetInt16t(pBBTT); // caretOffset
+    bbttGetInt16t(pBBTT); // reserved
+    bbttGetInt16t(pBBTT); // reserved
+    bbttGetInt16t(pBBTT); // reserved
+    bbttGetInt16t(pBBTT); // reserved
+    bbttGetInt16t(pBBTT); // metricDataFormat
+    pBBTT->numOfLongHorMetrics = bbttGetUInt16t(pBBTT); // numOfLongHorMetrics
     return 1;
 }
 
@@ -455,9 +470,15 @@ ttHMetric_t bbttGetHMetric(BBTT *pBBTT, uint16_t _code) {
     ttHMetric_t result;
     result.advanceWidth = 0;
 
+    if (_code >= pBBTT->numOfLongHorMetrics) { // must be monospaced font, use 0
+        _code = 0;
+    }
     bbttSeek(pBBTT, pBBTT->hmtxTablePos + (_code * 4));
     result.advanceWidth = bbttGetUInt16t(pBBTT);
     result.leftSideBearing = bbttGetInt16t(pBBTT);
+    if (result.advanceWidth == 0) { // monospaced font
+        result.advanceWidth = pBBTT->xMax - pBBTT->xMin;
+    }
 
     result.advanceWidth = (result.advanceWidth * pBBTT->characterSize) / pBBTT->headTable.unitsPerEm;
     result.leftSideBearing = (result.leftSideBearing * pBBTT->characterSize) / pBBTT->headTable.unitsPerEm;
@@ -1092,6 +1113,7 @@ uint8_t bbttSetTtfPointer(BBTT *pBBTT, uint8_t *p, uint32_t u32Size, uint8_t _ch
     readKern();
 #endif
     bbttReadHeadTable(pBBTT);
+    bbttReadHhea(pBBTT);
     return 1;
 }
 
